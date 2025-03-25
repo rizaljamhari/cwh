@@ -2,12 +2,14 @@
 
 namespace PhpNexus\Cwh\Handler;
 
-use Aws\CloudWatchLogs\CloudWatchLogsClient;
-use Monolog\Formatter\FormatterInterface;
-use Monolog\Formatter\LineFormatter;
-use Monolog\Handler\AbstractProcessingHandler;
-use Monolog\LogRecord;
 use Monolog\Level;
+use Monolog\LogRecord;
+use Monolog\Formatter\LineFormatter;
+use Monolog\Formatter\FormatterInterface;
+use Monolog\Handler\AbstractProcessingHandler;
+use AsyncAws\CloudWatchLogs\CloudWatchLogsClient;
+use AsyncAws\CloudWatchLogs\Input\PutLogEventsRequest;
+use AsyncAws\CloudWatchLogs\ValueObject\InputLogEvent;
 
 class CloudWatch extends AbstractProcessingHandler
 {
@@ -49,6 +51,7 @@ class CloudWatch extends AbstractProcessingHandler
     /**
      * CloudWatchLogs constructor.
      *
+     *  sdkParams: array of AWS SDK parameters (https://async-aws.com/configuration.html)
      *  Log group names must be unique within a region for an AWS account.
      *  Log group names can be between 1 and 512 characters long.
      *  Log group names consist of the following characters: a-z, A-Z, 0-9, '_' (underscore), '-' (hyphen),
@@ -60,7 +63,7 @@ class CloudWatch extends AbstractProcessingHandler
      * @throws \Exception
      */
     public function __construct(
-        CloudWatchLogsClient $client,
+        array $sdkParams,
         string $group,
         string $stream,
         int | null $retention = 14,
@@ -76,7 +79,7 @@ class CloudWatch extends AbstractProcessingHandler
             throw new \InvalidArgumentException('Batch size can not be greater than 10000');
         }
 
-        $this->client = $client;
+        $this->client = new CloudWatchLogsClient($sdkParams);
         $this->group = $group;
         $this->stream = $stream;
         $this->retention = $retention;
@@ -232,6 +235,13 @@ class CloudWatch extends AbstractProcessingHandler
             return $a['timestamp'] <=> $b['timestamp'];
         });
 
+        $entries = array_map(static function (array $entry) {
+            return new InputLogEvent([
+                'message' => $entry['message'],
+                'timestamp' => $entry['timestamp']
+            ]);
+        }, $entries);
+
         $data = [
             'logGroupName' => $this->group,
             'logStreamName' => $this->stream,
@@ -240,10 +250,9 @@ class CloudWatch extends AbstractProcessingHandler
 
         $this->checkThrottle();
 
-        $this->client->putLogEventsAsync($data)
-            ->otherwise(function ($e) {
-                error_log('AWS CloudWatchLogs async error: ' . $e->getMessage());
-            });
+        $this->client->putLogEvents($data);
+
+        $this->client->putLogEvents(new PutLogEventsRequest($data));
     }
 
     private function initializeGroup(): void
