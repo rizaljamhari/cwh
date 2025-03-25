@@ -235,13 +235,6 @@ class CloudWatch extends AbstractProcessingHandler
             return $a['timestamp'] <=> $b['timestamp'];
         });
 
-        $entries = array_map(static function (array $entry) {
-            return new InputLogEvent([
-                'message' => $entry['message'],
-                'timestamp' => $entry['timestamp']
-            ]);
-        }, $entries);
-
         $data = [
             'logGroupName' => $this->group,
             'logStreamName' => $this->stream,
@@ -251,8 +244,6 @@ class CloudWatch extends AbstractProcessingHandler
         $this->checkThrottle();
 
         $this->client->putLogEvents($data);
-
-        $this->client->putLogEvents(new PutLogEventsRequest($data));
     }
 
     private function initializeGroup(): void
@@ -322,12 +313,17 @@ class CloudWatch extends AbstractProcessingHandler
 
     private function initialize(): void
     {
-        if ($this->createGroup) {
-            $this->initializeGroup();
-        }
-        if ($this->createStream) {
-            $this->initializeStream();
-        }
+        // comment out the following lines to disable automatic group and stream creation
+        // this is because AsyncAws does not support some of the methods used in the original implementation
+        // we'll come back to this later (hopefully)
+
+
+        // if ($this->createGroup) {
+        //     $this->initializeGroup();
+        // }
+        // if ($this->createStream) {
+        //     $this->initializeStream();
+        // }
 
         $this->initialized = true;
     }
