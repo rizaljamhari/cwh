@@ -130,16 +130,7 @@ class CloudWatch extends AbstractProcessingHandler
                 $this->initialize();
             }
 
-            try {
-                // send items
-                $this->send($this->buffer);
-            } catch (\Aws\CloudWatchLogs\Exception\CloudWatchLogsException $e) {
-                error_log('AWS CloudWatchLogs threw an exception while sending items: ' . $e->getMessage());
-
-                // wait for 1 second and try to send items again (in case of per account per region rate limiting)
-                sleep(1);
-                $this->send($this->buffer);
-            }
+            $this->send($this->buffer);
 
             // clear buffer
             $this->buffer = [];
@@ -233,7 +224,6 @@ class CloudWatch extends AbstractProcessingHandler
      *
      * @param LogRecord[] $entries
      *
-     * @throws \Aws\CloudWatchLogs\Exception\CloudWatchLogsException Thrown by putLogEvents()
      */
     private function send(array $entries): void
     {
@@ -250,7 +240,10 @@ class CloudWatch extends AbstractProcessingHandler
 
         $this->checkThrottle();
 
-        $this->client->putLogEvents($data);
+        $this->client->putLogEventsAsync($data)
+            ->otherwise(function ($e) {
+                error_log('AWS CloudWatchLogs async error: ' . $e->getMessage());
+            });
     }
 
     private function initializeGroup(): void
