@@ -4,7 +4,7 @@ namespace PhpNexus\Cwh\Handler;
 
 use Monolog\Level;
 use Monolog\LogRecord;
-use Monolog\Formatter\LineFormatter;
+use Monolog\Formatter\JsonFormatter;
 use Monolog\Formatter\FormatterInterface;
 use Monolog\Handler\AbstractProcessingHandler;
 use AsyncAws\CloudWatchLogs\CloudWatchLogsClient;
@@ -330,7 +330,12 @@ class CloudWatch extends AbstractProcessingHandler
 
     protected function getDefaultFormatter(): FormatterInterface
     {
-        return new LineFormatter("%channel%: %level_name%: %message% %context% %extra%", null, false, true);
+        return new JsonFormatter();
+    }
+
+    public function flush(): void
+    {
+        $this->flushBuffer();
     }
 
     public function close(): void
